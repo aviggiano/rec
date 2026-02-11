@@ -4,6 +4,7 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from rec_pipeline.asr import ASRError, ASRPipeline, FasterWhisperTranscriber
 from rec_pipeline.config import load_settings
 from rec_pipeline.ingestion import IngestionProcessor
 
@@ -50,6 +51,39 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Language override for transcription (defaults to REC_DEFAULT_LANG)",
     )
+    run_parser.add_argument(
+        "--asr-model-size",
+        default=None,
+        help="faster-whisper model size (default from REC_ASR_MODEL_SIZE)",
+    )
+    run_parser.add_argument(
+        "--asr-device",
+        default=None,
+        help="ASR device for faster-whisper (default from REC_ASR_DEVICE)",
+    )
+    run_parser.add_argument(
+        "--asr-compute-type",
+        default=None,
+        help="ASR compute type for faster-whisper (default from REC_ASR_COMPUTE_TYPE)",
+    )
+    run_parser.add_argument(
+        "--asr-beam-size",
+        type=int,
+        default=None,
+        help="ASR decoding beam size (default from REC_ASR_BEAM_SIZE)",
+    )
+    run_parser.add_argument(
+        "--asr-vad-filter",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable VAD filter for ASR (default from REC_ASR_VAD_FILTER)",
+    )
+    run_parser.add_argument(
+        "--asr-max-retries",
+        type=int,
+        default=None,
+        help="Number of retries per file on transient ASR failures",
+    )
     run_parser.set_defaults(handler=_handle_run)
 
     return parser
@@ -59,7 +93,8 @@ def _handle_run(args: argparse.Namespace) -> int:
     settings = load_settings(args.env_file)
     language = args.lang or settings.default_language
     run_dir = args.output / args.run_name
-    processor = IngestionProcessor(fail_fast=args.fail_fast or not settings.continue_on_error)
+    should_fail_fast = args.fail_fast or not settings.continue_on_error
+    processor = IngestionProcessor(fail_fast=should_fail_fast)
     ingestion_result = processor.process_directory(args.input, run_dir)
     print(f"Ingestion completed. run_dir={run_dir}")
     print(
@@ -68,6 +103,33 @@ def _handle_run(args: argparse.Namespace) -> int:
         f"normalized={ingestion_result.normalized_count} "
         f"skipped={ingestion_result.skipped_count} "
         f"errors={len(ingestion_result.errors)}"
+    )
+    transcriber = FasterWhisperTranscriber(
+        model_size=args.asr_model_size or settings.asr_model_size,
+        device=args.asr_device or settings.asr_device,
+        compute_type=args.asr_compute_type or settings.asr_compute_type,
+    )
+    asr_pipeline = ASRPipeline(
+        transcriber=transcriber,
+        beam_size=args.asr_beam_size or settings.asr_beam_size,
+        vad_filter=(
+            settings.asr_vad_filter if args.asr_vad_filter is None else bool(args.asr_vad_filter)
+        ),
+        max_retries=args.asr_max_retries or settings.asr_max_retries,
+        retry_backoff_sec=0.5,
+        fail_fast=should_fail_fast,
+    )
+    try:
+        asr_result = asr_pipeline.transcribe_run(run_dir=run_dir, language=language)
+    except ASRError as exc:
+        print(f"ASR stage failed: {exc}")
+        return 1
+    print(
+        "ASR summary: "
+        f"files={len(asr_result.files)} "
+        f"transcribed={asr_result.transcribed_count} "
+        f"skipped={asr_result.skipped_count} "
+        f"errors={len(asr_result.errors)}"
     )
     print(
         f"Pipeline scaffold ready. asr_provider={settings.asr_provider} "

@@ -16,6 +16,12 @@ class RecSettings:
     default_language: str
     output_language: str
     continue_on_error: bool
+    asr_model_size: str
+    asr_device: str
+    asr_compute_type: str
+    asr_beam_size: int
+    asr_vad_filter: bool
+    asr_max_retries: int
     openai_api_key: str | None
     deepgram_api_key: str | None
     groq_api_key: str | None
@@ -38,6 +44,16 @@ def _env_optional(name: str) -> str | None:
     return stripped if stripped else None
 
 
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 def load_settings(env_file: str | Path | None = None) -> RecSettings:
     """Load settings from `.env` and environment variables."""
 
@@ -52,6 +68,12 @@ def load_settings(env_file: str | Path | None = None) -> RecSettings:
         default_language=os.getenv("REC_DEFAULT_LANG", "pt"),
         output_language=os.getenv("REC_OUTPUT_LANG", "pt"),
         continue_on_error=_env_bool("REC_CONTINUE_ON_ERROR", True),
+        asr_model_size=os.getenv("REC_ASR_MODEL_SIZE", "small"),
+        asr_device=os.getenv("REC_ASR_DEVICE", "auto"),
+        asr_compute_type=os.getenv("REC_ASR_COMPUTE_TYPE", "int8"),
+        asr_beam_size=_env_int("REC_ASR_BEAM_SIZE", 5),
+        asr_vad_filter=_env_bool("REC_ASR_VAD_FILTER", True),
+        asr_max_retries=_env_int("REC_ASR_MAX_RETRIES", 3),
         openai_api_key=_env_optional("OPENAI_API_KEY"),
         deepgram_api_key=_env_optional("DEEPGRAM_API_KEY"),
         groq_api_key=_env_optional("GROQ_API_KEY"),

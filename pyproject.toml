@@ -70,6 +70,10 @@ warn_unreachable = true
 namespace_packages = true
 mypy_path = ["src"]
 
+[[tool.mypy.overrides]]
+module = "faster_whisper"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

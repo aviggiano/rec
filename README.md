@@ -9,6 +9,7 @@
 - Assembles transcript artifacts (`txt`, `json`, `srt`).
 - Generates structured summaries with local-first defaults.
 - Supports resumable long runs with per-stage checkpoints and manifests.
+- Includes a local `faster-whisper` ASR stage with configurable model/runtime options.
 
 ## Local-first policy
 
@@ -29,6 +30,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -e ".[dev]"
+# for local ASR with faster-whisper
+pip install -e ".[asr]"
 cp .env.example .env
 ```
 
@@ -52,6 +55,19 @@ rec --help
 ```bash
 rec run --input ./recordings --output ./artifacts --run-name session-001
 # Running the same command again reuses checkpoints and skips completed normalization.
+```
+
+### ASR options
+
+```bash
+rec run \
+  --input ./recordings \
+  --lang pt \
+  --asr-model-size small \
+  --asr-device auto \
+  --asr-compute-type int8 \
+  --asr-beam-size 5 \
+  --asr-vad-filter
 ```
 
 ## Configuration
