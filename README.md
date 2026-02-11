@@ -70,6 +70,13 @@ rec run \
   --asr-vad-filter
 ```
 
+Run artifacts are created under `artifacts/<run-name>/` and include:
+- `asr/raw/*.segments.json`
+- `asr/raw_transcript_segments.json`
+- `artifacts/transcript.txt`
+- `artifacts/transcript.srt`
+- `artifacts/transcript.json`
+
 ## Configuration
 
 - Defaults come from environment variables and `.env`.

@@ -7,6 +7,7 @@ from pathlib import Path
 from rec_pipeline.asr import ASRError, ASRPipeline, FasterWhisperTranscriber
 from rec_pipeline.config import load_settings
 from rec_pipeline.ingestion import IngestionProcessor
+from rec_pipeline.transcript import TranscriptArtifactBuilder, TranscriptError
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -130,6 +131,18 @@ def _handle_run(args: argparse.Namespace) -> int:
         f"transcribed={asr_result.transcribed_count} "
         f"skipped={asr_result.skipped_count} "
         f"errors={len(asr_result.errors)}"
+    )
+    transcript_builder = TranscriptArtifactBuilder()
+    try:
+        transcript_result = transcript_builder.build(run_dir=run_dir, language=language)
+    except TranscriptError as exc:
+        print(f"Transcript assembly failed: {exc}")
+        return 1
+    print(
+        "Transcript summary: "
+        f"segments={transcript_result.segment_count} "
+        f"generated={len(transcript_result.generated_files)} "
+        f"skipped={len(transcript_result.skipped_files)}"
     )
     print(
         f"Pipeline scaffold ready. asr_provider={settings.asr_provider} "
