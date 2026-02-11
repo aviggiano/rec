@@ -113,6 +113,14 @@ Evaluation artifacts:
 Committed baseline reference report:
 - `evaluation/reports/baseline/evaluation_report.json`
 
+## CI/CD
+
+- PR/push CI workflow: `.github/workflows/ci.yml`
+- Nightly evaluation workflow: `.github/workflows/nightly-evaluation.yml`
+- Release workflow (tag `v*`): `.github/workflows/release.yml`
+- Branch protection config and apply script: `.github/branch-protection.json` and `.github/scripts/apply_branch_protection.sh`
+- CI/release validation checklist: `docs/ci-validation.md`
+
 ## Configuration
 
 - Defaults come from environment variables and `.env`.
