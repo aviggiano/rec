@@ -1,0 +1,22 @@
+{
+  "dataset_name": "fixture_eval",
+  "language": "pt",
+  "scenarios": [
+    {
+      "id": "fixture_short",
+      "multi_file": false,
+      "source_files": ["clip.wav"],
+      "reference_transcript": "Equipe alinhou cronograma e riscos principais.",
+      "predicted_transcript": "Equipe alinhou cronograma e risco principal.",
+      "reference_speakers": ["SPEAKER_00", "SPEAKER_01"],
+      "predicted_speakers": ["SPEAKER_00", "SPEAKER_01"],
+      "summary": {
+        "overview": {"text": "Reuniao curta", "citations": ["00:00:02.000"]},
+        "key_points": [{"text": "Cronograma alinhado", "citations": ["00:00:05.000"]}],
+        "decisions": [{"text": "Priorizar riscos", "citations": ["00:00:07.000"]}],
+        "action_items": [{"text": "Enviar ata", "citations": ["00:00:08.000"]}],
+        "open_questions": [{"text": "Sem novas duvidas", "citations": ["00:00:09.000"]}]
+      }
+    }
+  ]
+}

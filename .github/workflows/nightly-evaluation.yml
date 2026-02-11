@@ -1,0 +1,36 @@
+name: Nightly Evaluation
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run extended evaluation
+        run: |
+          rec evaluate \
+            --dataset evaluation/datasets/pt_noisy_subset.json \
+            --output evaluation/reports/nightly
+
+      - name: Upload evaluation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-evaluation-report
+          path: evaluation/reports/nightly/*

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from rec_pipeline.summary import (
     ChunkSummary,
+    SummaryItem,
     SummaryPipeline,
     TranscriptSegment,
     build_summary_payload,
@@ -140,3 +141,74 @@ def test_summary_pipeline_generates_summary_from_transcript_fixture(tmp_path: Pa
 
     built = build_summary_payload(synthesize_global_summary([], language="pt"))
     assert built["language"] == "pt"
+
+
+def test_empty_transcript_still_produces_non_empty_sections() -> None:
+    document = synthesize_global_summary([], language="pt")
+
+    assert isinstance(document.overview, SummaryItem)
+    assert document.key_points
+    assert document.decisions
+    assert document.action_items
+    assert document.open_questions
+
+
+def test_summary_pipeline_skips_model_inference_when_checkpoints_are_current(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "runs" / "skip"
+    artifacts_dir = run_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True)
+    transcript_payload = {
+        "schema_version": "1.0",
+        "language": "pt",
+        "segment_count": 1,
+        "segments": [
+            {
+                "id": 0,
+                "source_name": "a.wav",
+                "normalized_name": "0000_a.wav",
+                "text": "texto",
+                "timing": {
+                    "relative_start_sec": 0.0,
+                    "relative_end_sec": 1.0,
+                    "absolute_start_sec": 0.0,
+                    "absolute_end_sec": 1.0,
+                },
+                "metrics": {"avg_logprob": -0.1, "confidence": 0.9, "no_speech_prob": 0.01},
+            }
+        ],
+    }
+    (artifacts_dir / "transcript.json").write_text(json.dumps(transcript_payload), encoding="utf-8")
+
+    initial_pipeline = SummaryPipeline(
+        model_backend="heuristic",
+        model_name="unused",
+        ollama_base_url="http://localhost:11434",
+        llamacpp_server_url="http://localhost:8080",
+        max_chunk_tokens=20,
+        max_chunk_seconds=60,
+        fail_fast=True,
+    )
+    first_result = initial_pipeline.build(run_dir=run_dir, language="pt")
+    assert set(first_result.generated_files) == {"summary.md", "summary.json"}
+
+    class FailingModel:
+        def generate(self, prompt: str) -> str:
+            del prompt
+            raise RuntimeError("should not be called")
+
+    second_pipeline = SummaryPipeline(
+        model_backend="heuristic",
+        model_name="unused",
+        ollama_base_url="http://localhost:11434",
+        llamacpp_server_url="http://localhost:8080",
+        max_chunk_tokens=20,
+        max_chunk_seconds=60,
+        fail_fast=True,
+        model_override=FailingModel(),
+    )
+    second_result = second_pipeline.build(run_dir=run_dir, language="pt")
+
+    assert second_result.generated_files == []
+    assert set(second_result.skipped_files) == {"summary.md", "summary.json"}
