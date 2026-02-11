@@ -258,7 +258,9 @@ def _extract_input_archive(*, archive_path: Path, run_dir: Path) -> PreparedInpu
     checkpoints_dir = run_dir / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-    extracted_dir = (run_dir / "inputs" / archive_path.stem).resolve()
+    # Keep extracted archive input outside run_dir because ingestion excludes run_dir
+    # recursively when scanning input files.
+    extracted_dir = (run_dir.parent / ".rec_inputs" / run_dir.name / archive_path.stem).resolve()
     extraction_checkpoint = checkpoints_dir / "input_archive.extracted.json"
     fingerprint = _build_archive_fingerprint(archive_path)
 

@@ -217,6 +217,17 @@ def test_prepare_input_directory_extracts_and_reuses_zip(tmp_path: Path) -> None
     assert marker.read_text(encoding="utf-8") == "keep"
 
 
+def test_prepare_input_directory_extracts_zip_outside_run_dir(tmp_path: Path) -> None:
+    archive_path = tmp_path / "recordings.zip"
+    run_dir = tmp_path / "artifacts" / "demo"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("recordings/a.wav", "audio-a")
+
+    prepared = cli._prepare_input_directory(input_path=archive_path, run_dir=run_dir)
+
+    assert not prepared.directory.is_relative_to(run_dir.resolve())
+
+
 def test_prepare_input_directory_rejects_unsupported_file(tmp_path: Path) -> None:
     unsupported = tmp_path / "recordings.tar"
     unsupported.write_text("archive", encoding="utf-8")
