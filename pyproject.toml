@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rec"
+version = "0.1.0"
+description = "Local-first long-form audio transcription and summarization pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "rec contributors" }
+]
+license = { text = "MIT" }
+dependencies = [
+  "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+asr = [
+  "faster-whisper>=1.1.0",
+]
+summary = [
+  "requests>=2.32.0",
+]
+diarization = [
+  "pyannote.audio>=3.1.0",
+]
+eval = [
+  "jiwer>=3.0.5",
+]
+providers = [
+  "openai>=1.52.0",
+  "httpx>=0.27.2",
+]
+dev = [
+  "black>=24.8.0",
+  "mypy>=1.11.2",
+  "pre-commit>=3.8.0",
+  "pytest>=8.3.3",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.6.9",
+  "types-requests>=2.32.0.20241016",
+]
+
+[project.scripts]
+rec = "rec_pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+namespace_packages = true
+mypy_path = ["src"]
+
+[[tool.mypy.overrides]]
+module = "faster_whisper"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyannote.audio"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"

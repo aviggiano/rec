@@ -1,0 +1,38 @@
+{
+  "aggregate": {
+    "cer": 0.06503496503496503,
+    "der_proxy": 0.125,
+    "traceability_coverage": 1.0,
+    "wer": 0.19597069597069597
+  },
+  "dataset_path": "evaluation/datasets/pt_noisy_subset.json",
+  "gate_status": "passed",
+  "long_multifile_scenario_count": 1,
+  "metrics": [
+    {
+      "cer": 0.046153846153846156,
+      "der_proxy": 0.0,
+      "multi_file": false,
+      "scenario_id": "pt_short_sync",
+      "traceability_coverage": 1.0,
+      "wer": 0.15384615384615385
+    },
+    {
+      "cer": 0.08391608391608392,
+      "der_proxy": 0.25,
+      "multi_file": true,
+      "scenario_id": "pt_long_multifile_review",
+      "traceability_coverage": 1.0,
+      "wer": 0.23809523809523808
+    }
+  ],
+  "scenario_count": 2,
+  "thresholds": {
+    "blocking_gates": false,
+    "max_cer": 0.25,
+    "max_der_proxy": 0.4,
+    "max_wer": 0.35,
+    "min_traceability_coverage": 0.8
+  },
+  "violations": []
+}
