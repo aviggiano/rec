@@ -1,0 +1,38 @@
+{
+  "dataset_name": "pt_noisy_subset",
+  "language": "pt",
+  "scenarios": [
+    {
+      "id": "pt_short_sync",
+      "multi_file": false,
+      "source_files": ["short_01.wav"],
+      "reference_transcript": "Bom dia equipe. Vamos revisar as tarefas pendentes e confirmar o prazo final.",
+      "predicted_transcript": "Bom dia equipe. Vamos revisar tarefas pendentes e confirmar prazo final.",
+      "reference_speakers": ["SPEAKER_00", "SPEAKER_01", "SPEAKER_00"],
+      "predicted_speakers": ["SPEAKER_00", "SPEAKER_01", "SPEAKER_00"],
+      "summary": {
+        "overview": {"text": "Revisao curta de status.", "citations": ["00:00:01.200"]},
+        "key_points": [{"text": "Tarefas e prazo foram revisitados.", "citations": ["00:00:05.100"]}],
+        "decisions": [{"text": "Manter o prazo final acordado.", "citations": ["00:00:08.400"]}],
+        "action_items": [{"text": "Atualizar quadro de tarefas.", "citations": ["00:00:09.000"]}],
+        "open_questions": [{"text": "Nenhuma duvida aberta.", "citations": ["00:00:09.500"]}]
+      }
+    },
+    {
+      "id": "pt_long_multifile_review",
+      "multi_file": true,
+      "source_files": ["long_part_01.wav", "long_part_02.wav", "long_part_03.wav"],
+      "reference_transcript": "Na primeira parte discutimos objetivos trimestrais. Depois avaliamos riscos operacionais e custos. Por fim definimos responsaveis e proximo checkpoint de execucao.",
+      "predicted_transcript": "Na primeira parte discutimos objetivos trimestrais. Depois avaliamos riscos operacionais e custo. Por fim definimos responsaveis e o proximo checkpoint.",
+      "reference_speakers": ["SPEAKER_00", "SPEAKER_01", "SPEAKER_02", "SPEAKER_00"],
+      "predicted_speakers": ["SPEAKER_00", "SPEAKER_01", "SPEAKER_01", "SPEAKER_00"],
+      "summary": {
+        "overview": {"text": "Sessao longa com planejamento e riscos.", "citations": ["01:20:10.000"]},
+        "key_points": [{"text": "Objetivos, riscos e custos foram discutidos.", "citations": ["01:35:40.000"]}],
+        "decisions": [{"text": "Responsaveis e checkpoint foram definidos.", "citations": ["02:05:15.500"]}],
+        "action_items": [{"text": "Registrar dono por iniciativa.", "citations": ["02:06:00.000"]}],
+        "open_questions": [{"text": "Avaliar impacto financeiro residual.", "citations": ["02:07:30.000"]}]
+      }
+    }
+  ]
+}
