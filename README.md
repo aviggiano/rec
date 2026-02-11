@@ -8,6 +8,7 @@
 - Transcribes recordings with local ASR by default.
 - Assembles transcript artifacts (`txt`, `json`, `srt`).
 - Generates structured summaries with local-first defaults.
+- Supports resumable long runs with per-stage checkpoints and manifests.
 
 ## Local-first policy
 
@@ -44,6 +45,13 @@ make test
 
 ```bash
 rec --help
+```
+
+### 5. Run ingestion (resume-safe)
+
+```bash
+rec run --input ./recordings --output ./artifacts --run-name session-001
+# Running the same command again reuses checkpoints and skips completed normalization.
 ```
 
 ## Configuration
