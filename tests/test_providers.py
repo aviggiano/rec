@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -84,11 +85,14 @@ def test_external_provider_adapters_with_mocked_responses(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
+    captured_payloads: dict[str, dict[str, object]] = {}
+
     def fake_request(
         url: str, payload: dict[str, object], api_key: str, timeout_sec: int
     ) -> dict[str, object]:
-        del payload, api_key, timeout_sec
+        del api_key, timeout_sec
         if "audio/transcriptions" in url:
+            captured_payloads["asr"] = payload
             return {
                 "segments": [
                     {
@@ -99,6 +103,7 @@ def test_external_provider_adapters_with_mocked_responses(tmp_path: Path) -> Non
                     }
                 ]
             }
+        captured_payloads["summary"] = payload
         return {"text": "Resumo externo com citacao."}
 
     transcriber = ExternalASRTranscriber(
@@ -123,6 +128,12 @@ def test_external_provider_adapters_with_mocked_responses(tmp_path: Path) -> Non
 
     assert asr_result.transcribed_count == 1
     assert asr_result.files[0].segments[0].text == "fala externa"
+    assert "audio_base64" in captured_payloads["asr"]
+    assert "audio_path" not in captured_payloads["asr"]
+    assert captured_payloads["asr"]["audio_filename"] == "0000_clip.wav"
+    encoded_audio = captured_payloads["asr"]["audio_base64"]
+    assert isinstance(encoded_audio, str)
+    assert base64.b64decode(encoded_audio.encode("ascii")) == b"audio"
 
     transcript_result = TranscriptArtifactBuilder().build(run_dir=run_dir, language="pt")
     assert transcript_result.json_path.exists()
@@ -152,3 +163,4 @@ def test_external_provider_adapters_with_mocked_responses(tmp_path: Path) -> Non
     assert summary_result.json_path.exists()
     payload = json.loads(summary_result.json_path.read_text(encoding="utf-8"))
     assert payload["overview"]["text"]
+    assert isinstance(captured_payloads["summary"]["messages"], list)

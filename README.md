@@ -98,6 +98,29 @@ Run artifacts are created under `artifacts/<run-name>/` and include:
 - Missing provider keys fail fast with clear startup validation.
 - `REC_EXTERNAL_FALLBACK_TO_LOCAL=true` enables automatic fallback to local providers on external failures.
 
+### Evaluation harness
+
+```bash
+rec evaluate \
+  --dataset evaluation/datasets/pt_noisy_subset.json \
+  --output evaluation/reports/latest
+```
+
+Evaluation artifacts:
+- `evaluation_report.json`
+- `evaluation_report.md`
+
+Committed baseline reference report:
+- `evaluation/reports/baseline/evaluation_report.json`
+
+## CI/CD
+
+- PR/push CI workflow: `.github/workflows/ci.yml`
+- Nightly evaluation workflow: `.github/workflows/nightly-evaluation.yml`
+- Release workflow (tag `v*`): `.github/workflows/release.yml`
+- Branch protection config and apply script: `.github/branch-protection.json` and `.github/scripts/apply_branch_protection.sh`
+- CI/release validation checklist: `docs/ci-validation.md`
+
 ## Configuration
 
 - Defaults come from environment variables and `.env`.

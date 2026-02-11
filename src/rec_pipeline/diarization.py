@@ -231,6 +231,7 @@ class SpeakerDiarizationPipeline:
                 )
                 continue
 
+            should_write_checkpoint = True
             try:
                 turns = self._diarizer.diarize(normalized_path)
                 merged_segments = merge_segments_with_speakers(
@@ -246,6 +247,7 @@ class SpeakerDiarizationPipeline:
                 self._log(log_path, "diarization_error", file=normalized_name, error=str(exc))
                 if self._fail_fast:
                     raise DiarizationError(message) from exc
+                should_write_checkpoint = False
                 merged_segments = merge_segments_with_speakers(
                     [dict(segment) for segment in segments_payload],
                     [],
@@ -262,7 +264,8 @@ class SpeakerDiarizationPipeline:
             output_path.write_text(
                 json.dumps(merged_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-            checkpoint_path.write_text("ok\n", encoding="utf-8")
+            if should_write_checkpoint:
+                checkpoint_path.write_text("ok\n", encoding="utf-8")
             merged_files.append(merged_payload)
 
             self._collect_speaker_lines(
