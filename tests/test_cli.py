@@ -4,8 +4,11 @@ import argparse
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 import rec_pipeline.cli as cli
 
@@ -130,6 +133,21 @@ def test_cli_respects_zero_asr_max_retries_override(monkeypatch: object, tmp_pat
     monkeypatch.setattr(cli, "TranscriptArtifactBuilder", StubTranscriptArtifactBuilder)  # type: ignore[attr-defined]
     monkeypatch.setattr(cli, "SummaryPipeline", StubSummaryPipeline)  # type: ignore[attr-defined]
     monkeypatch.setattr(cli, "validate_provider_configuration", lambda **kwargs: None)  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        cli,
+        "_run_preflight_checks",
+        lambda *, requested_asr_provider: None,
+    )  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        cli,
+        "_prepare_input_directory",
+        lambda *, input_path, run_dir: cli.PreparedInput(
+            directory=input_path.resolve(),
+            source_path=input_path.resolve(),
+            source_type="directory",
+            archive_extracted=False,
+        ),
+    )  # type: ignore[attr-defined]
 
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -163,3 +181,68 @@ def test_cli_respects_zero_asr_max_retries_override(monkeypatch: object, tmp_pat
 
     assert code == 0
     assert captured["max_retries"] == 0
+
+
+def test_prepare_input_directory_accepts_directory(tmp_path: Path) -> None:
+    input_dir = tmp_path / "recordings"
+    input_dir.mkdir(parents=True)
+    run_dir = tmp_path / "artifacts" / "demo"
+
+    prepared = cli._prepare_input_directory(input_path=input_dir, run_dir=run_dir)
+
+    assert prepared.source_type == "directory"
+    assert prepared.directory == input_dir.resolve()
+    assert prepared.archive_extracted is False
+
+
+def test_prepare_input_directory_extracts_and_reuses_zip(tmp_path: Path) -> None:
+    archive_path = tmp_path / "recordings.zip"
+    run_dir = tmp_path / "artifacts" / "demo"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("recordings/a.wav", "audio-a")
+        archive.writestr("recordings/b.wav", "audio-b")
+
+    first = cli._prepare_input_directory(input_path=archive_path, run_dir=run_dir)
+    assert first.source_type == "archive"
+    assert first.archive_extracted is True
+    assert (first.directory / "recordings" / "a.wav").read_text(encoding="utf-8") == "audio-a"
+
+    marker = first.directory / "reused.marker"
+    marker.write_text("keep", encoding="utf-8")
+    second = cli._prepare_input_directory(input_path=archive_path, run_dir=run_dir)
+
+    assert second.source_type == "archive"
+    assert second.archive_extracted is False
+    assert second.directory == first.directory
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_prepare_input_directory_rejects_unsupported_file(tmp_path: Path) -> None:
+    unsupported = tmp_path / "recordings.tar"
+    unsupported.write_text("archive", encoding="utf-8")
+
+    with pytest.raises(cli.InputPreparationError, match="directory or a .zip archive"):
+        cli._prepare_input_directory(
+            input_path=unsupported, run_dir=tmp_path / "artifacts" / "demo"
+        )
+
+
+def test_run_preflight_checks_fails_without_ffmpeg(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        cli.shutil,
+        "which",
+        lambda binary_name: None if binary_name == "ffmpeg" else f"/usr/bin/{binary_name}",
+    )
+
+    with pytest.raises(cli.RunPreflightError, match="ffmpeg"):
+        cli._run_preflight_checks(requested_asr_provider="local")
+
+
+def test_run_preflight_checks_fails_without_local_asr_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cli.shutil, "which", lambda binary_name: f"/usr/bin/{binary_name}")
+    monkeypatch.setattr(cli, "_is_local_asr_runtime_available", lambda: False)
+
+    with pytest.raises(cli.RunPreflightError, match="faster-whisper"):
+        cli._run_preflight_checks(requested_asr_provider="local")

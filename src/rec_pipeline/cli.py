@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import zipfile
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -46,7 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--input",
         type=Path,
         required=True,
-        help="Input directory with recordings",
+        help="Input directory with recordings or a .zip archive",
     )
     run_parser.add_argument(
         "--output",
@@ -199,6 +202,147 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+class RunPreflightError(RuntimeError):
+    """Raised when required local runtime dependencies are missing."""
+
+
+class InputPreparationError(RuntimeError):
+    """Raised when CLI input cannot be prepared for ingestion."""
+
+
+@dataclass(frozen=True)
+class PreparedInput:
+    directory: Path
+    source_path: Path
+    source_type: str
+    archive_extracted: bool
+
+
+def _is_local_asr_runtime_available() -> bool:
+    try:
+        import faster_whisper  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _run_preflight_checks(*, requested_asr_provider: str) -> None:
+    missing_binaries = [
+        binary_name for binary_name in ("ffmpeg", "ffprobe") if shutil.which(binary_name) is None
+    ]
+    if missing_binaries:
+        missing_summary = ", ".join(missing_binaries)
+        raise RunPreflightError(
+            "Missing required system dependencies: "
+            f"{missing_summary}. Install ffmpeg/ffprobe and retry."
+        )
+
+    if requested_asr_provider == "local" and not _is_local_asr_runtime_available():
+        raise RunPreflightError(
+            "Local ASR provider requires faster-whisper. "
+            "Install optional deps with: pip install -e '.[asr]'"
+        )
+
+
+def _build_archive_fingerprint(archive_path: Path) -> dict[str, int | str]:
+    archive_stat = archive_path.stat()
+    return {
+        "archive_path": str(archive_path.resolve()),
+        "archive_size": archive_stat.st_size,
+        "archive_mtime_ns": archive_stat.st_mtime_ns,
+    }
+
+
+def _extract_input_archive(*, archive_path: Path, run_dir: Path) -> PreparedInput:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    checkpoints_dir = run_dir / "checkpoints"
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+    extracted_dir = (run_dir / "inputs" / archive_path.stem).resolve()
+    extraction_checkpoint = checkpoints_dir / "input_archive.extracted.json"
+    fingerprint = _build_archive_fingerprint(archive_path)
+
+    if extraction_checkpoint.exists():
+        try:
+            payload = json.loads(extraction_checkpoint.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            payload_extract_dir = Path(str(payload.get("extract_dir", ""))).resolve()
+            matches_fingerprint = (
+                payload.get("archive_path") == fingerprint["archive_path"]
+                and payload.get("archive_size") == fingerprint["archive_size"]
+                and payload.get("archive_mtime_ns") == fingerprint["archive_mtime_ns"]
+            )
+            if matches_fingerprint and payload_extract_dir.is_dir():
+                return PreparedInput(
+                    directory=payload_extract_dir,
+                    source_path=archive_path,
+                    source_type="archive",
+                    archive_extracted=False,
+                )
+
+    if extracted_dir.exists():
+        shutil.rmtree(extracted_dir)
+    extracted_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            destination_root = extracted_dir.resolve()
+            for member in archive.infolist():
+                destination_path = (extracted_dir / member.filename).resolve()
+                if not destination_path.is_relative_to(destination_root):
+                    raise InputPreparationError(
+                        f"Archive contains unsafe path traversal entry: {member.filename}"
+                    )
+            archive.extractall(extracted_dir)
+    except zipfile.BadZipFile as exc:
+        raise InputPreparationError(f"Input archive is invalid or corrupt: {archive_path}") from exc
+    except OSError as exc:
+        raise InputPreparationError(f"Failed to extract input archive: {archive_path}") from exc
+
+    extraction_checkpoint.write_text(
+        json.dumps(
+            {
+                **fingerprint,
+                "extract_dir": str(extracted_dir),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    return PreparedInput(
+        directory=extracted_dir,
+        source_path=archive_path,
+        source_type="archive",
+        archive_extracted=True,
+    )
+
+
+def _prepare_input_directory(*, input_path: Path, run_dir: Path) -> PreparedInput:
+    resolved_input_path = input_path.expanduser().resolve()
+    if not resolved_input_path.exists():
+        raise InputPreparationError(f"Input path does not exist: {resolved_input_path}")
+
+    if resolved_input_path.is_dir():
+        return PreparedInput(
+            directory=resolved_input_path,
+            source_path=resolved_input_path,
+            source_type="directory",
+            archive_extracted=False,
+        )
+
+    if resolved_input_path.suffix.lower() != ".zip":
+        raise InputPreparationError(
+            "Input must be a directory or a .zip archive: " f"{resolved_input_path}"
+        )
+
+    return _extract_input_archive(archive_path=resolved_input_path, run_dir=run_dir)
+
+
 def _handle_run(args: argparse.Namespace) -> int:
     settings = load_settings(args.env_file)
     language = args.lang or settings.default_language
@@ -224,8 +368,30 @@ def _handle_run(args: argparse.Namespace) -> int:
         print(f"Provider configuration error: {exc}")
         return 1
 
+    try:
+        _run_preflight_checks(requested_asr_provider=requested_asr_provider)
+    except RunPreflightError as exc:
+        print(f"Preflight failed: {exc}")
+        return 1
+
+    try:
+        prepared_input = _prepare_input_directory(input_path=args.input, run_dir=run_dir)
+    except InputPreparationError as exc:
+        print(f"Input preparation failed: {exc}")
+        return 1
+
+    if prepared_input.source_type == "archive":
+        action = "extracted" if prepared_input.archive_extracted else "reused"
+        print(
+            f"Input archive: action={action} "
+            f"archive={prepared_input.source_path} "
+            f"directory={prepared_input.directory}"
+        )
+    else:
+        print(f"Input directory: {prepared_input.directory}")
+
     processor = IngestionProcessor(fail_fast=should_fail_fast)
-    ingestion_result = processor.process_directory(args.input, run_dir)
+    ingestion_result = processor.process_directory(prepared_input.directory, run_dir)
     print(f"Ingestion completed. run_dir={run_dir}")
     print(
         "Ingestion summary: "
