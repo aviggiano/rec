@@ -57,6 +57,14 @@ rec run --input ./recordings --output ./artifacts --run-name session-001
 # Running the same command again reuses checkpoints and skips completed normalization.
 ```
 
+`--input` also accepts a `.zip` archive:
+
+```bash
+rec run --input /tmp/recordings.zip --output ./artifacts --run-name session-zip
+```
+
+When archive input is used, `rec` extracts into a run-scoped directory and reuses that extraction on resume when the archive has not changed.
+
 ### ASR options
 
 ```bash
