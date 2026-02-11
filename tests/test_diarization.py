@@ -160,3 +160,4 @@ def test_diarization_failure_can_continue_with_unknown_labels(tmp_path: Path) ->
         (run_dir / "asr" / "speaker_transcript_segments.json").read_text(encoding="utf-8")
     )
     assert aggregate["files"][0]["segments"][0]["speaker"] == "UNKNOWN"
+    assert not (run_dir / "checkpoints" / "0000_clip.diarization.done").exists()

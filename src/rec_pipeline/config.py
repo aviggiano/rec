@@ -82,7 +82,7 @@ def load_settings(env_file: str | Path | None = None) -> RecSettings:
     if env_file is not None:
         load_dotenv(dotenv_path=Path(env_file), override=False)
     else:
-        load_dotenv(override=False)
+        load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
 
     return RecSettings(
         asr_provider=os.getenv("REC_ASR_PROVIDER", "local"),

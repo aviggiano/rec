@@ -8,10 +8,12 @@
 
 ## Release workflow validation
 
-1. Trigger `Release` workflow via `workflow_dispatch` with `prerelease=true`.
+1. Trigger `Release` workflow via `workflow_dispatch` with:
+   - `tag_name` set to a temporary prerelease tag (for example `v0.0.0-rc1`)
+   - `prerelease=true`
 2. Confirm wheel/sdist artifacts are produced and attached to the prerelease.
-3. Trigger release by pushing a temporary test tag (for example `v0.0.0-rc1`) if needed.
-4. Remove test tag/release after validation.
+3. Optionally validate tag-push release flow by pushing the same temporary test tag.
+4. Remove temporary tag/release after validation.
 
 ## Secrets policy
 
