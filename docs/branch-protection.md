@@ -10,7 +10,7 @@ This repository uses branch protection for `main` and requires CI checks before 
 
 ## Review rules
 
-- At least 1 approving review
+- No approving reviews required
 - Dismiss stale approvals on new commits
 - Require conversation resolution before merge
 
