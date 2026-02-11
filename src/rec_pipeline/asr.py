@@ -182,7 +182,7 @@ class ASRPipeline:
         self._transcriber = transcriber
         self._beam_size = beam_size
         self._vad_filter = vad_filter
-        self._max_retries = max_retries
+        self._max_retries = max(0, max_retries)
         self._retry_backoff_sec = retry_backoff_sec
         self._fail_fast = fail_fast
 
@@ -339,9 +339,8 @@ class ASRPipeline:
     def _transcribe_with_retries(
         self, audio_path: Path, *, language: str
     ) -> list[TranscriptSegment]:
-        attempt = 0
-        while True:
-            attempt += 1
+        for retry_index in range(self._max_retries + 1):
+            attempt_number = retry_index + 1
             try:
                 return self._transcriber.transcribe(
                     audio_path,
@@ -350,12 +349,13 @@ class ASRPipeline:
                     beam_size=self._beam_size,
                 )
             except Exception as exc:  # noqa: BLE001
-                if attempt >= self._max_retries:
+                if retry_index >= self._max_retries:
                     raise ASRError(
-                        f"Transcription failed after {attempt} attempts: {audio_path}"
+                        f"Transcription failed after {attempt_number} attempts: {audio_path}"
                     ) from exc
-                sleep_for = self._retry_backoff_sec * (2 ** (attempt - 1))
+                sleep_for = self._retry_backoff_sec * (2**retry_index)
                 time.sleep(sleep_for)
+        raise ASRError(f"Transcription failed without attempts: {audio_path}")
 
     def _log(self, log_path: Path, event: str, **payload: object) -> None:
         entry = {

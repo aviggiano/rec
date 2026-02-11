@@ -6,6 +6,10 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
+      tag_name:
+        description: "Release tag name (for example v0.1.0-rc1)"
+        required: true
+        type: string
       prerelease:
         description: "Publish as prerelease"
         required: false
@@ -52,6 +56,7 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
           files: dist/*
           generate_release_notes: true
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}

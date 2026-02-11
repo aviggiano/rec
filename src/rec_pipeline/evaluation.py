@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from itertools import permutations
 from pathlib import Path
 
 
@@ -99,13 +100,34 @@ def compute_der_proxy(reference_speakers: list[str], predicted_speakers: list[st
         return 0.0
 
     total = max(len(reference_speakers), len(predicted_speakers))
-    mismatches = 0
-    for index in range(total):
-        reference = reference_speakers[index] if index < len(reference_speakers) else "<MISSING>"
-        predicted = predicted_speakers[index] if index < len(predicted_speakers) else "<MISSING>"
-        if reference != predicted:
-            mismatches += 1
-    return mismatches / total
+    aligned_reference = [
+        reference_speakers[index] if index < len(reference_speakers) else "<MISSING>"
+        for index in range(total)
+    ]
+    aligned_predicted = [
+        predicted_speakers[index] if index < len(predicted_speakers) else "<MISSING>"
+        for index in range(total)
+    ]
+
+    predicted_labels = sorted(set(aligned_predicted))
+    reference_labels = sorted(set(aligned_reference))
+    if len(reference_labels) < len(predicted_labels):
+        additional_count = len(predicted_labels) - len(reference_labels)
+        reference_labels = reference_labels + [
+            f"<UNMAPPED_{index}>" for index in range(additional_count)
+        ]
+
+    best_mismatches = total
+    for mapping_target in permutations(reference_labels, len(predicted_labels)):
+        mapping = dict(zip(predicted_labels, mapping_target, strict=True))
+        mismatches = 0
+        for reference, predicted in zip(aligned_reference, aligned_predicted, strict=True):
+            if reference != mapping[predicted]:
+                mismatches += 1
+        if mismatches < best_mismatches:
+            best_mismatches = mismatches
+
+    return best_mismatches / total
 
 
 def compute_summary_traceability_coverage(summary_payload: dict[str, object]) -> float:
@@ -145,7 +167,18 @@ def evaluate_dataset(
     if not dataset_path.exists():
         raise EvaluationError(f"Evaluation dataset not found: {dataset_path}")
 
-    payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    try:
+        dataset_content = dataset_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise EvaluationError(f"Failed to read evaluation dataset '{dataset_path}': {exc}") from exc
+    try:
+        payload = json.loads(dataset_content)
+    except json.JSONDecodeError as exc:
+        raise EvaluationError(
+            f"Malformed evaluation dataset JSON in '{dataset_path}': {exc}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise EvaluationError("Malformed evaluation dataset: top-level JSON must be an object")
     scenarios_payload = payload.get("scenarios", [])
     if not isinstance(scenarios_payload, list):
         raise EvaluationError("Malformed dataset: 'scenarios' must be a list")
