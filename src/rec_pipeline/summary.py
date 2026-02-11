@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import urllib.error
@@ -250,17 +251,16 @@ def synthesize_global_summary(
     chunk_summaries: list[ChunkSummary], *, language: str
 ) -> SummaryDocument:
     if not chunk_summaries:
-        empty_item = SummaryItem(
-            text="Sem dados suficientes." if language.startswith("pt") else "No data.", citations=[]
-        )
+        no_data = "Sem dados suficientes." if language.startswith("pt") else "No data."
+        empty_item = SummaryItem(text=no_data, citations=[])
         return SummaryDocument(
             language=language,
             chunk_summaries=[],
             overview=empty_item,
-            key_points=[],
-            decisions=[],
-            action_items=[],
-            open_questions=[],
+            key_points=[SummaryItem(text=no_data, citations=[])],
+            decisions=[SummaryItem(text=no_data, citations=[])],
+            action_items=[SummaryItem(text=no_data, citations=[])],
+            open_questions=[SummaryItem(text=no_data, citations=[])],
         )
 
     citations = [item.citations[0] for item in chunk_summaries if item.citations]
@@ -438,6 +438,7 @@ class SummaryPipeline:
         max_chunk_tokens: int,
         max_chunk_seconds: int,
         fail_fast: bool,
+        model_override: SummaryModel | None = None,
     ) -> None:
         self._model_backend = model_backend
         self._model_name = model_name
@@ -446,6 +447,7 @@ class SummaryPipeline:
         self._max_chunk_tokens = max_chunk_tokens
         self._max_chunk_seconds = max_chunk_seconds
         self._fail_fast = fail_fast
+        self._model_override = model_override
 
     def build(self, *, run_dir: Path, language: str) -> SummaryArtifactResult:
         artifacts_dir = run_dir / "artifacts"
@@ -465,13 +467,32 @@ class SummaryPipeline:
             ("summary.json", json_path, checkpoints_dir / "summary.json.done"),
         ]
 
+        transcript_hash = _file_sha256(run_dir / "artifacts" / "transcript.json")
+        all_outputs_checkpointed = all(
+            checkpoint_path.exists() and output_path.exists()
+            for _, output_path, checkpoint_path in jobs
+        )
+        if all_outputs_checkpointed and self._is_manifest_up_to_date(
+            manifest_path=manifest_path,
+            transcript_hash=transcript_hash,
+        ):
+            for label, _, _ in jobs:
+                self._log(log_path, "summary_skip_checkpoint", file=label)
+            return SummaryArtifactResult(
+                markdown_path=markdown_path,
+                json_path=json_path,
+                manifest_path=manifest_path,
+                generated_files=[],
+                skipped_files=[label for label, _, _ in jobs],
+            )
+
         segments = load_transcript_segments(run_dir)
         chunks = chunk_transcript(
             segments,
             max_chunk_tokens=self._max_chunk_tokens,
             max_chunk_seconds=float(self._max_chunk_seconds),
         )
-        model = self._build_model()
+        model = self._model_override or self._build_model()
 
         chunk_summaries: list[ChunkSummary] = []
         for chunk in chunks:
@@ -525,6 +546,7 @@ class SummaryPipeline:
             "model_backend": self._model_backend,
             "model_name": self._model_name,
             "chunk_count": len(chunks),
+            "input_transcript_sha256": transcript_hash,
             "generated_files": generated_files,
             "skipped_files": skipped_files,
             "artifacts": {
@@ -545,6 +567,16 @@ class SummaryPipeline:
             skipped_files=skipped_files,
         )
 
+    def _is_manifest_up_to_date(self, *, manifest_path: Path, transcript_hash: str) -> bool:
+        if not manifest_path.exists():
+            return False
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return False
+        input_hash = payload.get("input_transcript_sha256")
+        return isinstance(input_hash, str) and input_hash == transcript_hash
+
     def _build_model(self) -> SummaryModel:
         backend = self._model_backend.lower()
         if backend == "ollama":
@@ -559,3 +591,12 @@ class SummaryPipeline:
         entry = {"event": event, "payload": payload}
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, sort_keys=True) + "\n")
+
+
+def _file_sha256(path: Path) -> str:
+    if not path.exists():
+        raise SummaryError(f"Missing transcript artifact: {path}")
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise SummaryError(f"Failed to read transcript artifact '{path}': {exc}") from exc

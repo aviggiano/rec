@@ -85,8 +85,19 @@ def compute_offsets(durations_sec: list[float]) -> list[float]:
     return offsets
 
 
-def scan_input_files(input_dir: Path) -> list[Path]:
-    return sort_audio_paths([path for path in input_dir.rglob("*") if path.is_file()])
+def scan_input_files(input_dir: Path, *, excluded_dirs: list[Path] | None = None) -> list[Path]:
+    excluded = [path.resolve() for path in (excluded_dirs or [])]
+    return sort_audio_paths(
+        [
+            path
+            for path in input_dir.rglob("*")
+            if path.is_file() and not _is_excluded_path(path.resolve(), excluded)
+        ]
+    )
+
+
+def _is_excluded_path(path: Path, excluded_dirs: list[Path]) -> bool:
+    return any(path.is_relative_to(excluded_dir) for excluded_dir in excluded_dirs)
 
 
 def probe_audio_ffprobe(audio_path: Path) -> AudioProbe:
@@ -234,12 +245,13 @@ class IngestionProcessor:
         checkpoints_dir.mkdir(parents=True, exist_ok=True)
         logs_dir.mkdir(parents=True, exist_ok=True)
 
-        candidate_files = scan_input_files(input_dir)
+        candidate_files = scan_input_files(input_dir, excluded_dirs=[run_dir])
         prepared_files: list[_PreparedFile] = []
         errors: list[str] = []
         normalized_count = 0
         skipped_count = 0
 
+        valid_audio_files: list[Path] = []
         for source_path in candidate_files:
             extension = source_path.suffix.lower()
             if extension not in SUPPORTED_EXTENSIONS:
@@ -249,8 +261,9 @@ class IngestionProcessor:
                 if self._fail_fast:
                     raise IngestionError(message)
                 continue
+            valid_audio_files.append(source_path)
 
-            index = len(prepared_files)
+        for index, source_path in enumerate(valid_audio_files):
             slug = _slugify(source_path.stem)
             normalized_name = f"{index:04d}_{slug}.wav"
             normalized_path = normalized_dir / normalized_name
@@ -294,14 +307,13 @@ class IngestionProcessor:
                     duration_sec=probe.duration_sec,
                 )
 
-                if not normalized_path.exists():
-                    _log_stage(
-                        stage_log_path,
-                        "normalize_start",
-                        source_path=str(source_path),
-                        normalized_path=str(normalized_path),
-                    )
-                    self._normalize_fn(source_path, normalized_path)
+                _log_stage(
+                    stage_log_path,
+                    "normalize_start",
+                    source_path=str(source_path),
+                    normalized_path=str(normalized_path),
+                )
+                self._normalize_fn(source_path, normalized_path)
                 _log_stage(
                     stage_log_path,
                     "normalize_done",

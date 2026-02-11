@@ -74,6 +74,10 @@ mypy_path = ["src"]
 module = "faster_whisper"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "pyannote.audio"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

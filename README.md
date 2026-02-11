@@ -68,6 +68,9 @@ rec run \
   --asr-compute-type int8 \
   --asr-beam-size 5 \
   --asr-vad-filter \
+  --diarization \
+  --asr-provider local \
+  --summary-provider local \
   --summary-local-backend ollama \
   --summary-model llama3.2
 ```
@@ -80,6 +83,43 @@ Run artifacts are created under `artifacts/<run-name>/` and include:
 - `artifacts/transcript.json`
 - `artifacts/summary.md`
 - `artifacts/summary.json`
+- `artifacts/speakers/speaker_*.txt` (when diarization export is enabled)
+- `run_metadata.json` (records requested/effective providers and fallback usage)
+
+### Diarization notes (pyannote)
+
+- Local diarization uses `pyannote.audio`.
+- Set `HUGGINGFACE_TOKEN` in `.env` before enabling diarization so the pyannote model can be downloaded.
+
+### Optional external providers
+
+- Supported provider IDs: `openai`, `deepgram`, `groq`.
+- Provider choice is explicit via `REC_ASR_PROVIDER` / `REC_SUMMARY_PROVIDER` or CLI flags.
+- Missing provider keys fail fast with clear startup validation.
+- `REC_EXTERNAL_FALLBACK_TO_LOCAL=true` enables automatic fallback to local providers on external failures.
+
+### Evaluation harness
+
+```bash
+rec evaluate \
+  --dataset evaluation/datasets/pt_noisy_subset.json \
+  --output evaluation/reports/latest
+```
+
+Evaluation artifacts:
+- `evaluation_report.json`
+- `evaluation_report.md`
+
+Committed baseline reference report:
+- `evaluation/reports/baseline/evaluation_report.json`
+
+## CI/CD
+
+- PR/push CI workflow: `.github/workflows/ci.yml`
+- Nightly evaluation workflow: `.github/workflows/nightly-evaluation.yml`
+- Release workflow (tag `v*`): `.github/workflows/release.yml`
+- Branch protection config and apply script: `.github/branch-protection.json` and `.github/scripts/apply_branch_protection.sh`
+- CI/release validation checklist: `docs/ci-validation.md`
 
 ## Configuration
 
