@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -23,6 +24,7 @@ class AssembledSegment:
     relative_end_sec: float
     absolute_start_sec: float
     absolute_end_sec: float
+    speaker: str | None
     avg_logprob: float | None
     confidence: float | None
     no_speech_prob: float | None
@@ -66,8 +68,17 @@ def _parse_ingestion_offsets(run_dir: Path) -> dict[str, float]:
     return offsets
 
 
-def _load_asr_payload(run_dir: Path) -> dict[str, object]:
-    asr_payload_path = run_dir / "asr" / "raw_transcript_segments.json"
+def _load_asr_payload(run_dir: Path, *, prefer_diarized: bool | None) -> dict[str, object]:
+    diarized_asr_path = run_dir / "asr" / "speaker_transcript_segments.json"
+    raw_asr_path = run_dir / "asr" / "raw_transcript_segments.json"
+    asr_payload_path = raw_asr_path
+    if _should_use_diarized_asr_payload(
+        run_dir=run_dir,
+        raw_asr_path=raw_asr_path,
+        diarized_asr_path=diarized_asr_path,
+        prefer_diarized=prefer_diarized,
+    ):
+        asr_payload_path = diarized_asr_path
     if not asr_payload_path.exists():
         raise TranscriptError(f"Missing ASR aggregate payload: {asr_payload_path}")
     payload = json.loads(asr_payload_path.read_text(encoding="utf-8"))
@@ -76,9 +87,43 @@ def _load_asr_payload(run_dir: Path) -> dict[str, object]:
     return payload
 
 
-def assemble_transcript(run_dir: Path, *, language: str) -> TranscriptDocument:
+def _should_use_diarized_asr_payload(
+    *,
+    run_dir: Path,
+    raw_asr_path: Path,
+    diarized_asr_path: Path,
+    prefer_diarized: bool | None,
+) -> bool:
+    if not diarized_asr_path.exists():
+        return False
+    if prefer_diarized is False:
+        return False
+    if raw_asr_path.exists() and diarized_asr_path.stat().st_mtime < raw_asr_path.stat().st_mtime:
+        return False
+    if prefer_diarized is True:
+        return True
+    return _read_diarization_enabled_from_run_metadata(run_dir)
+
+
+def _read_diarization_enabled_from_run_metadata(run_dir: Path) -> bool:
+    metadata_path = run_dir / "run_metadata.json"
+    if not metadata_path.exists():
+        return False
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    return bool(payload.get("diarization_enabled", False))
+
+
+def assemble_transcript(
+    run_dir: Path,
+    *,
+    language: str,
+    prefer_diarized: bool | None = None,
+) -> TranscriptDocument:
     offsets = _parse_ingestion_offsets(run_dir)
-    asr_payload = _load_asr_payload(run_dir)
+    asr_payload = _load_asr_payload(run_dir, prefer_diarized=prefer_diarized)
 
     files_payload = asr_payload.get("files", [])
     if not isinstance(files_payload, list):
@@ -130,6 +175,7 @@ def assemble_transcript(run_dir: Path, *, language: str) -> TranscriptDocument:
                     relative_end_sec=relative_end,
                     absolute_start_sec=absolute_start,
                     absolute_end_sec=absolute_end,
+                    speaker=_optional_str(segment_payload.get("speaker")),
                     avg_logprob=_optional_float(segment_payload.get("avg_logprob")),
                     confidence=_optional_float(segment_payload.get("confidence")),
                     no_speech_prob=_optional_float(segment_payload.get("no_speech_prob")),
@@ -141,13 +187,20 @@ def assemble_transcript(run_dir: Path, *, language: str) -> TranscriptDocument:
         key=lambda item: (item.absolute_start_sec, item.absolute_end_sec, item.segment_id)
     )
 
+    previous_start = -1.0
     previous_end = -1.0
     for segment in assembled:
-        if segment.absolute_start_sec < previous_end:
+        if segment.absolute_start_sec < previous_start:
             raise TranscriptError(
                 "Absolute timeline is non-monotonic after stitching "
-                f"at segment {segment.segment_id}: {segment.absolute_start_sec} < {previous_end}"
+                f"at segment {segment.segment_id}: {segment.absolute_start_sec} < {previous_start}"
             )
+        if segment.absolute_end_sec < previous_end:
+            raise TranscriptError(
+                "Absolute timeline has non-monotonic end timestamps "
+                f"at segment {segment.segment_id}: {segment.absolute_end_sec} < {previous_end}"
+            )
+        previous_start = segment.absolute_start_sec
         previous_end = segment.absolute_end_sec
 
     return TranscriptDocument(language=language, segments=assembled)
@@ -163,6 +216,7 @@ def build_transcript_payload(document: TranscriptDocument) -> dict[str, object]:
                 "id": segment.segment_id,
                 "source_name": segment.source_name,
                 "normalized_name": segment.normalized_name,
+                "speaker": segment.speaker,
                 "text": segment.text,
                 "timing": {
                     "relative_start_sec": segment.relative_start_sec,
@@ -256,7 +310,11 @@ def format_text_timestamp(seconds: float) -> str:
 def write_transcript_txt(document: TranscriptDocument, path: Path) -> None:
     lines: list[str] = []
     for segment in document.segments:
-        lines.append(f"[{format_text_timestamp(segment.absolute_start_sec)}] " f"{segment.text}")
+        speaker_prefix = f"[{segment.speaker}] " if segment.speaker else ""
+        lines.append(
+            f"[{format_text_timestamp(segment.absolute_start_sec)}] "
+            f"{speaker_prefix}{segment.text}"
+        )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -289,8 +347,21 @@ def _optional_float(value: object) -> float | None:
     return None
 
 
+def _optional_str(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped if stripped else None
+
+
 class TranscriptArtifactBuilder:
-    def build(self, *, run_dir: Path, language: str) -> TranscriptArtifactResult:
+    def build(
+        self,
+        *,
+        run_dir: Path,
+        language: str,
+        prefer_diarized: bool | None = None,
+    ) -> TranscriptArtifactResult:
         artifacts_dir = run_dir / "artifacts"
         checkpoints_dir = run_dir / "checkpoints"
         logs_dir = run_dir / "logs"
@@ -299,7 +370,12 @@ class TranscriptArtifactBuilder:
         logs_dir.mkdir(parents=True, exist_ok=True)
         log_path = logs_dir / "transcript.jsonl"
 
-        document = assemble_transcript(run_dir, language=language)
+        document = assemble_transcript(
+            run_dir,
+            language=language,
+            prefer_diarized=prefer_diarized,
+        )
+        document_hash = _document_hash(document)
 
         transcript_path = artifacts_dir / "transcript.txt"
         srt_path = artifacts_dir / "transcript.srt"
@@ -329,9 +405,11 @@ class TranscriptArtifactBuilder:
 
         generated_files: list[str] = []
         skipped_files: list[str] = []
+        previous_manifest_hash = self._read_previous_manifest_hash(manifest_path)
+        force_rebuild = previous_manifest_hash != document_hash
 
         for label, output_path, checkpoint_path, writer in jobs:
-            if checkpoint_path.exists() and output_path.exists():
+            if not force_rebuild and checkpoint_path.exists() and output_path.exists():
                 skipped_files.append(label)
                 self._log(log_path, "transcript_skip_checkpoint", file=label)
                 continue
@@ -343,6 +421,7 @@ class TranscriptArtifactBuilder:
         manifest_payload = {
             "language": language,
             "segment_count": len(document.segments),
+            "document_hash": document_hash,
             "generated_files": generated_files,
             "skipped_files": skipped_files,
             "artifacts": {
@@ -367,7 +446,23 @@ class TranscriptArtifactBuilder:
             segment_count=len(document.segments),
         )
 
+    def _read_previous_manifest_hash(self, manifest_path: Path) -> str | None:
+        if not manifest_path.exists():
+            return None
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
+        value = payload.get("document_hash")
+        return str(value) if isinstance(value, str) else None
+
     def _log(self, log_path: Path, event: str, **payload: object) -> None:
         entry = {"event": event, "payload": payload}
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, sort_keys=True) + "\n")
+
+
+def _document_hash(document: TranscriptDocument) -> str:
+    payload = build_transcript_payload(document)
+    raw = json.dumps(payload, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
