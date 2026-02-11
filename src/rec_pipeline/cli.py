@@ -13,6 +13,7 @@ from rec_pipeline.diarization import (
     PyannoteDiarizer,
     SpeakerDiarizationPipeline,
 )
+from rec_pipeline.evaluation import EvaluationError, default_thresholds, evaluate_dataset
 from rec_pipeline.ingestion import IngestionProcessor
 from rec_pipeline.providers import (
     ExternalASRTranscriber,
@@ -159,6 +160,41 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Enable or disable per-speaker text export files",
     )
     run_parser.set_defaults(handler=_handle_run)
+
+    evaluate_parser = subparsers.add_parser("evaluate", help="Run quality evaluation harness")
+    evaluate_parser.add_argument(
+        "--dataset",
+        type=Path,
+        default=Path("evaluation/datasets/pt_noisy_subset.json"),
+        help="Path to evaluation dataset JSON",
+    )
+    evaluate_parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("evaluation/reports/latest"),
+        help="Directory for evaluation report artifacts",
+    )
+    evaluate_parser.add_argument("--max-wer", type=float, default=None, help="Maximum allowed WER")
+    evaluate_parser.add_argument("--max-cer", type=float, default=None, help="Maximum allowed CER")
+    evaluate_parser.add_argument(
+        "--max-der-proxy",
+        type=float,
+        default=None,
+        help="Maximum allowed DER proxy",
+    )
+    evaluate_parser.add_argument(
+        "--min-traceability-coverage",
+        type=float,
+        default=None,
+        help="Minimum required summary traceability coverage",
+    )
+    evaluate_parser.add_argument(
+        "--blocking-gates",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Treat quality gate violations as blocking failures",
+    )
+    evaluate_parser.set_defaults(handler=_handle_evaluate)
 
     return parser
 
@@ -413,6 +449,64 @@ def _handle_run(args: argparse.Namespace) -> int:
         f"Pipeline scaffold ready. asr_provider={effective_asr_provider} "
         f"summary_provider={effective_summary_provider} lang={language}"
     )
+    return 0
+
+
+def _handle_evaluate(args: argparse.Namespace) -> int:
+    thresholds = default_thresholds(blocking_gates=bool(args.blocking_gates))
+    if args.max_wer is not None:
+        thresholds = thresholds.__class__(
+            max_wer=args.max_wer,
+            max_cer=thresholds.max_cer,
+            max_der_proxy=thresholds.max_der_proxy,
+            min_traceability_coverage=thresholds.min_traceability_coverage,
+            blocking_gates=thresholds.blocking_gates,
+        )
+    if args.max_cer is not None:
+        thresholds = thresholds.__class__(
+            max_wer=thresholds.max_wer,
+            max_cer=args.max_cer,
+            max_der_proxy=thresholds.max_der_proxy,
+            min_traceability_coverage=thresholds.min_traceability_coverage,
+            blocking_gates=thresholds.blocking_gates,
+        )
+    if args.max_der_proxy is not None:
+        thresholds = thresholds.__class__(
+            max_wer=thresholds.max_wer,
+            max_cer=thresholds.max_cer,
+            max_der_proxy=args.max_der_proxy,
+            min_traceability_coverage=thresholds.min_traceability_coverage,
+            blocking_gates=thresholds.blocking_gates,
+        )
+    if args.min_traceability_coverage is not None:
+        thresholds = thresholds.__class__(
+            max_wer=thresholds.max_wer,
+            max_cer=thresholds.max_cer,
+            max_der_proxy=thresholds.max_der_proxy,
+            min_traceability_coverage=args.min_traceability_coverage,
+            blocking_gates=thresholds.blocking_gates,
+        )
+
+    try:
+        report = evaluate_dataset(
+            dataset_path=args.dataset,
+            output_dir=args.output,
+            thresholds=thresholds,
+        )
+    except EvaluationError as exc:
+        print(f"Evaluation failed: {exc}")
+        return 1
+
+    print(f"Evaluation complete. output={args.output}")
+    print(
+        "Evaluation summary: "
+        f"scenarios={report.scenario_count} "
+        f"long_multifile={report.long_multifile_scenario_count} "
+        f"gate_status={report.gate_status} "
+        f"violations={len(report.violations)}"
+    )
+    if report.gate_status == "failed":
+        return 1
     return 0
 
 

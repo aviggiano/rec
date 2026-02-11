@@ -98,6 +98,21 @@ Run artifacts are created under `artifacts/<run-name>/` and include:
 - Missing provider keys fail fast with clear startup validation.
 - `REC_EXTERNAL_FALLBACK_TO_LOCAL=true` enables automatic fallback to local providers on external failures.
 
+### Evaluation harness
+
+```bash
+rec evaluate \
+  --dataset evaluation/datasets/pt_noisy_subset.json \
+  --output evaluation/reports/latest
+```
+
+Evaluation artifacts:
+- `evaluation_report.json`
+- `evaluation_report.md`
+
+Committed baseline reference report:
+- `evaluation/reports/baseline/evaluation_report.json`
+
 ## Configuration
 
 - Defaults come from environment variables and `.env`.
