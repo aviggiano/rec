@@ -26,6 +26,10 @@ class RecSettings:
     summary_model_name: str
     summary_max_chunk_tokens: int
     summary_max_chunk_seconds: int
+    diarization_enabled: bool
+    diarization_model_name: str
+    diarization_export_speakers: bool
+    huggingface_token: str | None
     openai_api_key: str | None
     deepgram_api_key: str | None
     groq_api_key: str | None
@@ -82,6 +86,13 @@ def load_settings(env_file: str | Path | None = None) -> RecSettings:
         summary_model_name=os.getenv("REC_SUMMARY_MODEL", "llama3.2"),
         summary_max_chunk_tokens=_env_int("REC_SUMMARY_MAX_CHUNK_TOKENS", 1200),
         summary_max_chunk_seconds=_env_int("REC_SUMMARY_MAX_CHUNK_SECONDS", 900),
+        diarization_enabled=_env_bool("REC_DIARIZATION_ENABLED", False),
+        diarization_model_name=os.getenv(
+            "REC_DIARIZATION_MODEL_NAME",
+            "pyannote/speaker-diarization-3.1",
+        ),
+        diarization_export_speakers=_env_bool("REC_DIARIZATION_EXPORT_SPEAKERS", True),
+        huggingface_token=_env_optional("HUGGINGFACE_TOKEN"),
         openai_api_key=_env_optional("OPENAI_API_KEY"),
         deepgram_api_key=_env_optional("DEEPGRAM_API_KEY"),
         groq_api_key=_env_optional("GROQ_API_KEY"),

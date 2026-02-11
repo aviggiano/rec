@@ -23,6 +23,7 @@ class AssembledSegment:
     relative_end_sec: float
     absolute_start_sec: float
     absolute_end_sec: float
+    speaker: str | None
     avg_logprob: float | None
     confidence: float | None
     no_speech_prob: float | None
@@ -67,7 +68,12 @@ def _parse_ingestion_offsets(run_dir: Path) -> dict[str, float]:
 
 
 def _load_asr_payload(run_dir: Path) -> dict[str, object]:
-    asr_payload_path = run_dir / "asr" / "raw_transcript_segments.json"
+    diarized_asr_path = run_dir / "asr" / "speaker_transcript_segments.json"
+    asr_payload_path = (
+        diarized_asr_path
+        if diarized_asr_path.exists()
+        else run_dir / "asr" / "raw_transcript_segments.json"
+    )
     if not asr_payload_path.exists():
         raise TranscriptError(f"Missing ASR aggregate payload: {asr_payload_path}")
     payload = json.loads(asr_payload_path.read_text(encoding="utf-8"))
@@ -130,6 +136,7 @@ def assemble_transcript(run_dir: Path, *, language: str) -> TranscriptDocument:
                     relative_end_sec=relative_end,
                     absolute_start_sec=absolute_start,
                     absolute_end_sec=absolute_end,
+                    speaker=_optional_str(segment_payload.get("speaker")),
                     avg_logprob=_optional_float(segment_payload.get("avg_logprob")),
                     confidence=_optional_float(segment_payload.get("confidence")),
                     no_speech_prob=_optional_float(segment_payload.get("no_speech_prob")),
@@ -163,6 +170,7 @@ def build_transcript_payload(document: TranscriptDocument) -> dict[str, object]:
                 "id": segment.segment_id,
                 "source_name": segment.source_name,
                 "normalized_name": segment.normalized_name,
+                "speaker": segment.speaker,
                 "text": segment.text,
                 "timing": {
                     "relative_start_sec": segment.relative_start_sec,
@@ -256,7 +264,11 @@ def format_text_timestamp(seconds: float) -> str:
 def write_transcript_txt(document: TranscriptDocument, path: Path) -> None:
     lines: list[str] = []
     for segment in document.segments:
-        lines.append(f"[{format_text_timestamp(segment.absolute_start_sec)}] " f"{segment.text}")
+        speaker_prefix = f"[{segment.speaker}] " if segment.speaker else ""
+        lines.append(
+            f"[{format_text_timestamp(segment.absolute_start_sec)}] "
+            f"{speaker_prefix}{segment.text}"
+        )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -287,6 +299,13 @@ def _optional_float(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def _optional_str(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped if stripped else None
 
 
 class TranscriptArtifactBuilder:

@@ -22,9 +22,13 @@ def test_config_loading_defaults_without_external_keys(monkeypatch: object, tmp_
         "REC_SUMMARY_MODEL",
         "REC_SUMMARY_MAX_CHUNK_TOKENS",
         "REC_SUMMARY_MAX_CHUNK_SECONDS",
+        "REC_DIARIZATION_ENABLED",
+        "REC_DIARIZATION_MODEL_NAME",
+        "REC_DIARIZATION_EXPORT_SPEAKERS",
         "OPENAI_API_KEY",
         "DEEPGRAM_API_KEY",
         "GROQ_API_KEY",
+        "HUGGINGFACE_TOKEN",
         "OLLAMA_BASE_URL",
         "LLAMACPP_SERVER_URL",
     ]
@@ -51,6 +55,10 @@ def test_config_loading_defaults_without_external_keys(monkeypatch: object, tmp_
     assert settings.summary_model_name == "llama3.2"
     assert settings.summary_max_chunk_tokens == 1200
     assert settings.summary_max_chunk_seconds == 900
+    assert settings.diarization_enabled is False
+    assert settings.diarization_model_name == "pyannote/speaker-diarization-3.1"
+    assert settings.diarization_export_speakers is True
+    assert settings.huggingface_token is None
     assert settings.openai_api_key is None
     assert settings.deepgram_api_key is None
     assert settings.groq_api_key is None

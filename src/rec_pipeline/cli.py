@@ -6,6 +6,11 @@ from pathlib import Path
 
 from rec_pipeline.asr import ASRError, ASRPipeline, FasterWhisperTranscriber
 from rec_pipeline.config import load_settings
+from rec_pipeline.diarization import (
+    DiarizationError,
+    PyannoteDiarizer,
+    SpeakerDiarizationPipeline,
+)
 from rec_pipeline.ingestion import IngestionProcessor
 from rec_pipeline.summary import SummaryError, SummaryPipeline
 from rec_pipeline.transcript import TranscriptArtifactBuilder, TranscriptError
@@ -108,6 +113,23 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Maximum transcript seconds per summarization chunk",
     )
+    run_parser.add_argument(
+        "--diarization",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable local speaker diarization stage",
+    )
+    run_parser.add_argument(
+        "--diarization-model",
+        default=None,
+        help="pyannote diarization model name",
+    )
+    run_parser.add_argument(
+        "--diarization-export-speakers",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable per-speaker text export files",
+    )
     run_parser.set_defaults(handler=_handle_run)
 
     return parser
@@ -155,6 +177,41 @@ def _handle_run(args: argparse.Namespace) -> int:
         f"skipped={asr_result.skipped_count} "
         f"errors={len(asr_result.errors)}"
     )
+    diarization_enabled = (
+        settings.diarization_enabled if args.diarization is None else bool(args.diarization)
+    )
+    if diarization_enabled:
+        diarizer = PyannoteDiarizer(
+            model_name=args.diarization_model or settings.diarization_model_name,
+            hf_token=settings.huggingface_token,
+        )
+        diarization_pipeline = SpeakerDiarizationPipeline(
+            diarizer=diarizer,
+            fail_fast=should_fail_fast,
+        )
+        try:
+            diarization_result = diarization_pipeline.run(
+                run_dir=run_dir,
+                enabled=True,
+                export_per_speaker=(
+                    settings.diarization_export_speakers
+                    if args.diarization_export_speakers is None
+                    else bool(args.diarization_export_speakers)
+                ),
+            )
+        except DiarizationError as exc:
+            print(f"Diarization failed: {exc}")
+            return 1
+        print(
+            "Diarization summary: "
+            f"processed={diarization_result.processed_files} "
+            f"skipped={diarization_result.skipped_files} "
+            f"segments={diarization_result.labeled_segments} "
+            f"errors={len(diarization_result.errors)} "
+            f"speaker_exports={len(diarization_result.speaker_exports)}"
+        )
+    else:
+        print("Diarization summary: disabled")
     transcript_builder = TranscriptArtifactBuilder()
     try:
         transcript_result = transcript_builder.build(run_dir=run_dir, language=language)

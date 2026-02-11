@@ -68,6 +68,7 @@ rec run \
   --asr-compute-type int8 \
   --asr-beam-size 5 \
   --asr-vad-filter \
+  --diarization \
   --summary-local-backend ollama \
   --summary-model llama3.2
 ```
@@ -80,6 +81,12 @@ Run artifacts are created under `artifacts/<run-name>/` and include:
 - `artifacts/transcript.json`
 - `artifacts/summary.md`
 - `artifacts/summary.json`
+- `artifacts/speakers/speaker_*.txt` (when diarization export is enabled)
+
+### Diarization notes (pyannote)
+
+- Local diarization uses `pyannote.audio`.
+- Set `HUGGINGFACE_TOKEN` in `.env` before enabling diarization so the pyannote model can be downloaded.
 
 ## Configuration
 

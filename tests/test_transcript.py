@@ -99,6 +99,7 @@ def test_transcript_json_schema_validation() -> None:
                 relative_end_sec=1.0,
                 absolute_start_sec=0.0,
                 absolute_end_sec=1.0,
+                speaker=None,
                 avg_logprob=-0.1,
                 confidence=0.9,
                 no_speech_prob=0.05,
