@@ -30,6 +30,10 @@ class RecSettings:
     diarization_model_name: str
     diarization_export_speakers: bool
     huggingface_token: str | None
+    external_fallback_to_local: bool
+    provider_timeout_sec: int
+    provider_max_retries: int
+    provider_retry_base_delay_sec: float
     openai_api_key: str | None
     deepgram_api_key: str | None
     groq_api_key: str | None
@@ -58,6 +62,16 @@ def _env_int(name: str, default: int) -> int:
         return default
     try:
         return int(value)
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
     except ValueError:
         return default
 
@@ -93,6 +107,10 @@ def load_settings(env_file: str | Path | None = None) -> RecSettings:
         ),
         diarization_export_speakers=_env_bool("REC_DIARIZATION_EXPORT_SPEAKERS", True),
         huggingface_token=_env_optional("HUGGINGFACE_TOKEN"),
+        external_fallback_to_local=_env_bool("REC_EXTERNAL_FALLBACK_TO_LOCAL", True),
+        provider_timeout_sec=_env_int("REC_PROVIDER_TIMEOUT_SEC", 120),
+        provider_max_retries=_env_int("REC_PROVIDER_MAX_RETRIES", 3),
+        provider_retry_base_delay_sec=_env_float("REC_PROVIDER_RETRY_BASE_DELAY_SEC", 0.5),
         openai_api_key=_env_optional("OPENAI_API_KEY"),
         deepgram_api_key=_env_optional("DEEPGRAM_API_KEY"),
         groq_api_key=_env_optional("GROQ_API_KEY"),

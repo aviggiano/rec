@@ -25,6 +25,10 @@ def test_config_loading_defaults_without_external_keys(monkeypatch: object, tmp_
         "REC_DIARIZATION_ENABLED",
         "REC_DIARIZATION_MODEL_NAME",
         "REC_DIARIZATION_EXPORT_SPEAKERS",
+        "REC_EXTERNAL_FALLBACK_TO_LOCAL",
+        "REC_PROVIDER_TIMEOUT_SEC",
+        "REC_PROVIDER_MAX_RETRIES",
+        "REC_PROVIDER_RETRY_BASE_DELAY_SEC",
         "OPENAI_API_KEY",
         "DEEPGRAM_API_KEY",
         "GROQ_API_KEY",
@@ -59,6 +63,10 @@ def test_config_loading_defaults_without_external_keys(monkeypatch: object, tmp_
     assert settings.diarization_model_name == "pyannote/speaker-diarization-3.1"
     assert settings.diarization_export_speakers is True
     assert settings.huggingface_token is None
+    assert settings.external_fallback_to_local is True
+    assert settings.provider_timeout_sec == 120
+    assert settings.provider_max_retries == 3
+    assert settings.provider_retry_base_delay_sec == 0.5
     assert settings.openai_api_key is None
     assert settings.deepgram_api_key is None
     assert settings.groq_api_key is None

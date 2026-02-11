@@ -438,6 +438,7 @@ class SummaryPipeline:
         max_chunk_tokens: int,
         max_chunk_seconds: int,
         fail_fast: bool,
+        model_override: SummaryModel | None = None,
     ) -> None:
         self._model_backend = model_backend
         self._model_name = model_name
@@ -446,6 +447,7 @@ class SummaryPipeline:
         self._max_chunk_tokens = max_chunk_tokens
         self._max_chunk_seconds = max_chunk_seconds
         self._fail_fast = fail_fast
+        self._model_override = model_override
 
     def build(self, *, run_dir: Path, language: str) -> SummaryArtifactResult:
         artifacts_dir = run_dir / "artifacts"
@@ -471,7 +473,7 @@ class SummaryPipeline:
             max_chunk_tokens=self._max_chunk_tokens,
             max_chunk_seconds=float(self._max_chunk_seconds),
         )
-        model = self._build_model()
+        model = self._model_override or self._build_model()
 
         chunk_summaries: list[ChunkSummary] = []
         for chunk in chunks:
