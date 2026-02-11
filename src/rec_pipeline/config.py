@@ -22,6 +22,10 @@ class RecSettings:
     asr_beam_size: int
     asr_vad_filter: bool
     asr_max_retries: int
+    summary_local_backend: str
+    summary_model_name: str
+    summary_max_chunk_tokens: int
+    summary_max_chunk_seconds: int
     openai_api_key: str | None
     deepgram_api_key: str | None
     groq_api_key: str | None
@@ -74,6 +78,10 @@ def load_settings(env_file: str | Path | None = None) -> RecSettings:
         asr_beam_size=_env_int("REC_ASR_BEAM_SIZE", 5),
         asr_vad_filter=_env_bool("REC_ASR_VAD_FILTER", True),
         asr_max_retries=_env_int("REC_ASR_MAX_RETRIES", 3),
+        summary_local_backend=os.getenv("REC_SUMMARY_LOCAL_BACKEND", "ollama"),
+        summary_model_name=os.getenv("REC_SUMMARY_MODEL", "llama3.2"),
+        summary_max_chunk_tokens=_env_int("REC_SUMMARY_MAX_CHUNK_TOKENS", 1200),
+        summary_max_chunk_seconds=_env_int("REC_SUMMARY_MAX_CHUNK_SECONDS", 900),
         openai_api_key=_env_optional("OPENAI_API_KEY"),
         deepgram_api_key=_env_optional("DEEPGRAM_API_KEY"),
         groq_api_key=_env_optional("GROQ_API_KEY"),

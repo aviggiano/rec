@@ -7,6 +7,7 @@ from pathlib import Path
 from rec_pipeline.asr import ASRError, ASRPipeline, FasterWhisperTranscriber
 from rec_pipeline.config import load_settings
 from rec_pipeline.ingestion import IngestionProcessor
+from rec_pipeline.summary import SummaryError, SummaryPipeline
 from rec_pipeline.transcript import TranscriptArtifactBuilder, TranscriptError
 
 
@@ -85,6 +86,28 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Number of retries per file on transient ASR failures",
     )
+    run_parser.add_argument(
+        "--summary-local-backend",
+        default=None,
+        help="Local summary backend: ollama, llamacpp, or heuristic",
+    )
+    run_parser.add_argument(
+        "--summary-model",
+        default=None,
+        help="Model name for local summary backends that require one",
+    )
+    run_parser.add_argument(
+        "--summary-max-chunk-tokens",
+        type=int,
+        default=None,
+        help="Maximum estimated tokens per transcript chunk for summarization",
+    )
+    run_parser.add_argument(
+        "--summary-max-chunk-seconds",
+        type=int,
+        default=None,
+        help="Maximum transcript seconds per summarization chunk",
+    )
     run_parser.set_defaults(handler=_handle_run)
 
     return parser
@@ -143,6 +166,25 @@ def _handle_run(args: argparse.Namespace) -> int:
         f"segments={transcript_result.segment_count} "
         f"generated={len(transcript_result.generated_files)} "
         f"skipped={len(transcript_result.skipped_files)}"
+    )
+    summary_pipeline = SummaryPipeline(
+        model_backend=args.summary_local_backend or settings.summary_local_backend,
+        model_name=args.summary_model or settings.summary_model_name,
+        ollama_base_url=settings.ollama_base_url,
+        llamacpp_server_url=settings.llamacpp_server_url,
+        max_chunk_tokens=args.summary_max_chunk_tokens or settings.summary_max_chunk_tokens,
+        max_chunk_seconds=args.summary_max_chunk_seconds or settings.summary_max_chunk_seconds,
+        fail_fast=should_fail_fast,
+    )
+    try:
+        summary_result = summary_pipeline.build(run_dir=run_dir, language=settings.output_language)
+    except SummaryError as exc:
+        print(f"Summarization failed: {exc}")
+        return 1
+    print(
+        "Summary stage: "
+        f"generated={len(summary_result.generated_files)} "
+        f"skipped={len(summary_result.skipped_files)}"
     )
     print(
         f"Pipeline scaffold ready. asr_provider={settings.asr_provider} "

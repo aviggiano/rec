@@ -67,7 +67,9 @@ rec run \
   --asr-device auto \
   --asr-compute-type int8 \
   --asr-beam-size 5 \
-  --asr-vad-filter
+  --asr-vad-filter \
+  --summary-local-backend ollama \
+  --summary-model llama3.2
 ```
 
 Run artifacts are created under `artifacts/<run-name>/` and include:
@@ -76,6 +78,8 @@ Run artifacts are created under `artifacts/<run-name>/` and include:
 - `artifacts/transcript.txt`
 - `artifacts/transcript.srt`
 - `artifacts/transcript.json`
+- `artifacts/summary.md`
+- `artifacts/summary.json`
 
 ## Configuration
 
