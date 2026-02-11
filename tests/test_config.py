@@ -70,3 +70,16 @@ def test_config_loading_defaults_without_external_keys(monkeypatch: object, tmp_
     assert settings.openai_api_key is None
     assert settings.deepgram_api_key is None
     assert settings.groq_api_key is None
+
+
+def test_config_default_env_file_is_loaded_from_current_working_directory(
+    monkeypatch: object, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("REC_DEFAULT_LANG", raising=False)  # type: ignore[attr-defined]
+    env_file = tmp_path / ".env"
+    env_file.write_text("REC_DEFAULT_LANG=en\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)  # type: ignore[attr-defined]
+
+    settings = load_settings()
+
+    assert settings.default_language == "en"

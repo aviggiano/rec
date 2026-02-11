@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import time
 import urllib.error
@@ -196,10 +197,16 @@ class ExternalASRTranscriber:
                 f"No ASR endpoint configured for provider '{self.provider_name}'"
             )
 
+        try:
+            audio_bytes = audio_path.read_bytes()
+        except OSError as exc:
+            raise ProviderRequestError(f"Unable to read audio file '{audio_path}': {exc}") from exc
+
         payload: dict[str, object] = {
             "model": self.model_name,
             "language": language,
-            "audio_path": str(audio_path),
+            "audio_filename": audio_path.name,
+            "audio_base64": base64.b64encode(audio_bytes).decode("ascii"),
         }
         response = call_with_retry(
             lambda: self.request_fn(endpoint, payload, self.api_key, self.timeout_sec),
@@ -272,10 +279,16 @@ class ExternalSummaryModel:
                 f"No summary endpoint configured for provider '{self.provider_name}'"
             )
 
-        payload: dict[str, object] = {
-            "model": self.model_name,
-            "input": prompt,
-        }
+        if self.provider_name in {"openai", "groq"}:
+            payload: dict[str, object] = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+        else:
+            payload = {
+                "model": self.model_name,
+                "input": prompt,
+            }
         response = call_with_retry(
             lambda: self.request_fn(endpoint, payload, self.api_key, self.timeout_sec),
             max_retries=self.max_retries,

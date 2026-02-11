@@ -246,7 +246,9 @@ def _handle_run(args: argparse.Namespace) -> int:
     vad_filter = (
         settings.asr_vad_filter if args.asr_vad_filter is None else bool(args.asr_vad_filter)
     )
-    asr_max_retries = args.asr_max_retries or settings.asr_max_retries
+    asr_max_retries = (
+        args.asr_max_retries if args.asr_max_retries is not None else settings.asr_max_retries
+    )
 
     asr_transcriber: Transcriber
     if requested_asr_provider == "local":
@@ -358,7 +360,11 @@ def _handle_run(args: argparse.Namespace) -> int:
         print("Diarization summary: disabled")
     transcript_builder = TranscriptArtifactBuilder()
     try:
-        transcript_result = transcript_builder.build(run_dir=run_dir, language=language)
+        transcript_result = transcript_builder.build(
+            run_dir=run_dir,
+            language=language,
+            prefer_diarized=diarization_enabled,
+        )
     except TranscriptError as exc:
         print(f"Transcript assembly failed: {exc}")
         return 1
