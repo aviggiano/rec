@@ -1,0 +1,67 @@
+name: advisory-checks
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: advisory-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  markdown-lint:
+    name: markdown-lint
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Markdown lint (advisory)
+        uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          globs: |
+            **/*.md
+
+  links:
+    name: links
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Link check (advisory)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --max-concurrency 8 --accept 200,206,301,302,403,429 '**/*.md'
+
+  reminder:
+    if: always()
+    needs:
+      - markdown-lint
+      - links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Advisory policy reminder
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## Non-blocking advisory checks
+          - This workflow is informational and does not block merges.
+          - Re-run flaky failures once.
+          - If failures persist but `repo-sanity` is green, merge and open a flake issue.
+          EOF

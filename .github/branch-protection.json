@@ -2,9 +2,7 @@
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "quality-checks",
-      "smoke-matrix (ubuntu-latest)",
-      "smoke-matrix (macos-latest)"
+      "repo-sanity"
     ]
   },
   "enforce_admins": true,

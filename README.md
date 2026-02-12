@@ -123,11 +123,14 @@ Committed baseline reference report:
 
 ## CI/CD
 
-- PR/push CI workflow: `.github/workflows/ci.yml`
-- Nightly evaluation workflow: `.github/workflows/nightly-evaluation.yml`
-- Release workflow (tag `v*`): `.github/workflows/release.yml`
-- Branch protection config and apply script: `.github/branch-protection.json` and `.github/scripts/apply_branch_protection.sh`
-- CI/release validation checklist: `docs/ci-validation.md`
+- Required merge gate workflow: `.github/workflows/merge-gate.yml` (`repo-sanity`).
+- Advisory checks workflow: `.github/workflows/advisory-checks.yml`.
+- PR/push CI workflow: `.github/workflows/ci.yml`.
+- Nightly evaluation workflow: `.github/workflows/nightly-evaluation.yml`.
+- Release workflow (tag `v*`): `.github/workflows/release.yml`.
+- Branch protection config and apply script: `.github/branch-protection.json` and `.github/scripts/apply_branch_protection.sh`.
+- Throughput merge policy docs: `docs/engineering/merge-philosophy.md`, `docs/engineering/ci-policy.md`, `docs/engineering/github-settings.md`.
+- CI/release validation checklist: `docs/ci-validation.md`.
 
 ## Configuration
 
