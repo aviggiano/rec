@@ -1,0 +1,43 @@
+name: CI flake report
+description: Track flaky advisory CI failures without blocking merges indefinitely.
+title: "[ci-flake] "
+labels:
+  - ci
+  - flake
+body:
+  - type: input
+    id: workflow
+    attributes:
+      label: Workflow and check name
+      description: Use "workflow / check" format.
+      placeholder: advisory-checks / links
+    validations:
+      required: true
+  - type: input
+    id: pr_link
+    attributes:
+      label: PR or commit link
+      placeholder: https://github.com/ORG/REPO/pull/123
+    validations:
+      required: true
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Failure symptom
+      description: Short description plus the most useful log excerpt.
+    validations:
+      required: true
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Why it appears flaky
+      description: Note why this is likely non-deterministic rather than a product bug.
+    validations:
+      required: true
+  - type: textarea
+    id: next_step
+    attributes:
+      label: Next step
+      description: Planned mitigation and target date.
+    validations:
+      required: true

@@ -4,9 +4,12 @@ This repository uses branch protection for `main` and requires CI checks before 
 
 ## Required checks
 
-- `quality-checks`
-- `smoke-matrix (ubuntu-latest)`
-- `smoke-matrix (macos-latest)`
+- `repo-sanity` (from `.github/workflows/merge-gate.yml`)
+
+Advisory/non-blocking checks still run for signal quality:
+
+- `.github/workflows/ci.yml` (`quality-checks`, `smoke-matrix`)
+- `.github/workflows/advisory-checks.yml` (`markdown-lint`, `links`)
 
 ## Review rules
 

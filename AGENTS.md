@@ -79,14 +79,31 @@ Guidance for coding agents working in `rec`.
 - Keep mypy strictness intact unless there is a strong reason to relax it.
 - Add or update tests for behavioral changes.
 
+## Throughput-first merge policy
+
+- Keep pull requests short-lived and focused.
+- Keep one deterministic required merge check: `repo-sanity` from `.github/workflows/merge-gate.yml`.
+- Treat slower checks as advisory signals and avoid indefinite blocking due to flakes.
+- Re-run flaky advisory checks once; if `repo-sanity` is green and failure looks flaky, merge and open a follow-up issue via `.github/ISSUE_TEMPLATE/ci-flake.yml`.
+- Prefer small follow-up PRs over waiting on non-critical cleanup.
+
 ## CI/CD and release guardrails
 
 - Keep workflows healthy:
+  - `.github/workflows/merge-gate.yml`
+  - `.github/workflows/advisory-checks.yml`
   - `.github/workflows/ci.yml`
   - `.github/workflows/nightly-evaluation.yml`
   - `.github/workflows/release.yml`
 - Direct merges to `main` are allowed when local validation is completed.
 - Prioritize delivery speed; use PR gates only when they add clear coordination value.
+
+## Reference docs
+
+- `docs/engineering/merge-philosophy.md`
+- `docs/engineering/ci-policy.md`
+- `docs/engineering/github-settings.md`
+- `docs/branch-protection.md`
 
 ## PR and branching best practices
 

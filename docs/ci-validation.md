@@ -2,9 +2,10 @@
 
 ## CI enforcement validation
 
-1. Open a temporary PR with an intentional lint or test failure.
-2. Confirm `quality-checks` fails and merge is blocked by branch protection.
-3. Revert the intentional failure and confirm checks pass.
+1. Open a temporary PR with an intentional `repo_sanity.sh` failure (for example, add a temporary required file entry that does not exist).
+2. Confirm `repo-sanity` fails and merge is blocked by branch protection.
+3. Revert the intentional failure and confirm `repo-sanity` passes.
+4. Optionally trigger an advisory failure (lint/link) and confirm merge is still allowed when `repo-sanity` is green.
 
 ## Release workflow validation
 
