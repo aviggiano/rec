@@ -5,8 +5,8 @@
 `rec` follows a throughput-first merge philosophy: waiting is expensive, and
 corrections are cheap when pull requests stay small.
 
-This is inspired by OpenAI's Harness Engineering write-up (February 11, 2026):
-https://openai.com/index/harness-engineering/
+This is inspired by OpenAI's
+[Harness Engineering write-up (February 11, 2026)](https://openai.com/index/harness-engineering/).
 
 The important tradeoff is context-dependent:
 
