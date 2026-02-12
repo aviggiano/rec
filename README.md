@@ -84,6 +84,7 @@ rec run \
 ```
 
 Run artifacts are created under `artifacts/<run-name>/` and include:
+
 - `asr/raw/*.segments.json`
 - `asr/raw_transcript_segments.json`
 - `artifacts/transcript.txt`
@@ -115,10 +116,12 @@ rec evaluate \
 ```
 
 Evaluation artifacts:
+
 - `evaluation_report.json`
 - `evaluation_report.md`
 
 Committed baseline reference report:
+
 - `evaluation/reports/baseline/evaluation_report.json`
 
 ## CI/CD

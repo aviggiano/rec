@@ -6,15 +6,18 @@
 - Gate status: **passed**
 
 ## Aggregate Metrics
+
 - WER: 0.196
 - CER: 0.065
 - DER proxy: 0.125
 - Summary traceability coverage: 1.000
 
 ## Quality Gates
+
 - No threshold violations
 
 ## Scenario Metrics
+
 - `pt_short_sync`
   - multi_file: False
   - wer: 0.154
