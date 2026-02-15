@@ -17,6 +17,7 @@ SUPPORTED_EXTENSIONS = {
     ".mp3",
     ".mp4",
     ".ogg",
+    ".opus",
     ".wav",
 }
 

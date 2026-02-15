@@ -179,3 +179,31 @@ def test_file_index_stays_stable_when_early_file_fails_then_succeeds(tmp_path: P
     assert second.skipped_count == 1
     assert normalize_calls["a"] == 1
     assert normalize_calls["b"] == 1
+
+
+def test_opus_input_is_converted_to_wav_artifact(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    input_dir.mkdir(parents=True)
+    source_file = input_dir / "meeting.opus"
+    source_file.write_bytes(b"opus-bytes")
+
+    def fake_probe(audio_path: Path) -> AudioProbe:
+        del audio_path
+        return AudioProbe(duration_sec=3.0, sample_rate_hz=48000, channels=1, codec_name="opus")
+
+    def fake_normalize(source_path: Path, destination_path: Path) -> None:
+        del source_path
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        destination_path.write_bytes(b"wav-bytes")
+
+    processor = IngestionProcessor(probe_fn=fake_probe, normalize_fn=fake_normalize, fail_fast=True)
+    run_dir = tmp_path / "runs" / "opus-demo"
+
+    result = processor.process_directory(input_dir=input_dir, run_dir=run_dir)
+
+    assert result.normalized_count == 1
+    assert result.errors == []
+    assert len(result.files) == 1
+    assert result.files[0].source_name == "meeting.opus"
+    assert result.files[0].normalized_name == "0000_meeting.wav"
+    assert Path(result.files[0].normalized_path).name == "0000_meeting.wav"

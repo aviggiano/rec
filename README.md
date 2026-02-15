@@ -5,6 +5,7 @@
 ## What it does
 
 - Ingests and normalizes recording files for deterministic processing.
+  Supported input audio/container types include `.wav`, `.mp3`, `.m4a`, `.flac`, `.ogg`, and `.opus`.
 - Transcribes recordings with local ASR by default.
 - Assembles transcript artifacts (`txt`, `json`, `srt`).
 - Generates structured summaries with local-first defaults.
