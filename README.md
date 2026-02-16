@@ -58,6 +58,15 @@ rec run --input ./recordings --output ./artifacts --run-name session-001
 # Running the same command again reuses checkpoints and skips completed normalization.
 ```
 
+`--input` accepts a directory or a `.zip` archive, not a single audio file path.
+If you only have one file, put it in a folder first:
+
+```bash
+mkdir -p ./recordings
+cp ~/Downloads/audio1.opus ./recordings/
+rec run --input ./recordings --output ./artifacts --run-name single-file
+```
+
 `--input` also accepts a `.zip` archive:
 
 ```bash
